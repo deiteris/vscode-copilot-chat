@@ -25,6 +25,9 @@ export interface RawThinkingDelta {
 	// Anthropic fields
 	thinking?: string;
 	signature?: string;
+
+	// OpenAI-compatible reasoning field used by DeepSeek, Qwen, and llama.cpp (deepseek reasoning_format)
+	reasoning_content?: string;
 }
 
 export type ThinkingDelta = {
