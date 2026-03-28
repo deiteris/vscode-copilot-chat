@@ -52,6 +52,7 @@ export interface BYOKModelCapabilities {
 	maxInputTokens: number;
 	maxOutputTokens: number;
 	toolCalling: boolean;
+	parallelToolCalls?: boolean;
 	vision: boolean;
 	thinking?: boolean;
 	adaptiveThinking?: boolean;
@@ -106,6 +107,7 @@ export function resolveModelInfo(modelId: string, providerName: string, knownMod
 			supports: {
 				streaming: knownModelInfo?.streaming ?? true,
 				tool_calls: !!knownModelInfo?.toolCalling,
+				parallel_tool_calls: knownModelInfo?.parallelToolCalls,
 				vision: !!knownModelInfo?.vision,
 				thinking: !!knownModelInfo?.thinking,
 				adaptive_thinking: !!knownModelInfo?.adaptiveThinking

@@ -291,6 +291,17 @@ export class OpenAIEndpoint extends ChatEndpoint {
 			if (!this.useResponsesApi && body.stream) {
 				body['stream_options'] = { 'include_usage': true };
 			}
+			// Disable parallel tool calls unless the model explicitly supports them.
+			// Local servers like llama.cpp (peg-native format) only parse one <tool_call>
+			// block at a time, so parallel calls cause a parse failure at the server.
+			if (body.tools?.length && this.modelMetadata.capabilities.supports.parallel_tool_calls !== undefined) {
+				body.parallel_tool_calls = this.modelMetadata.capabilities.supports.parallel_tool_calls;
+			} else if (body.tools?.length) {
+				// When unspecified, default to false so llama.cpp-compatible servers (which
+				// default to false too) don't generate multiple tool calls that their PEG
+				// parser cannot handle.
+				body.parallel_tool_calls = false;
+			}
 		}
 	}
 

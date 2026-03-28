@@ -112,6 +112,7 @@ export class OllamaLMProvider extends AbstractOpenAICompatibleLMProvider<OllamaC
 					maxOutputTokens: modelInfo.capabilities.limits?.max_output_tokens ?? 4096,
 					name: modelInfo.name,
 					toolCalling: !!modelInfo.capabilities.supports.tool_calls,
+					parallelToolCalls: modelInfo.capabilities.supports.parallel_tool_calls,
 					vision: !!modelInfo.capabilities.supports.vision
 				};
 			}
@@ -149,7 +150,8 @@ export class OllamaLMProvider extends AbstractOpenAICompatibleLMProvider<OllamaC
 			maxOutputTokens: outputTokens,
 			maxInputTokens: contextWindow - outputTokens,
 			vision: modelInfo.capabilities.includes('vision'),
-			toolCalling: modelInfo.capabilities.includes('tools')
+			toolCalling: modelInfo.capabilities.includes('tools'),
+			parallelToolCalls: modelInfo.capabilities.includes('parallel_tool_calls') ? true : undefined
 		};
 
 		return resolveModelInfo(modelId, this._name, this._knownModels, modelCapabilities);
