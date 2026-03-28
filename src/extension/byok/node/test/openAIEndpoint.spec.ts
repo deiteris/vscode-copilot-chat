@@ -86,7 +86,7 @@ describe('OpenAIEndpoint - Reasoning Properties', () => {
 	});
 
 	describe('CAPI mode (useResponsesApi = false)', () => {
-		it('should set cot_id and cot_summary properties when processing thinking content', () => {
+		it('should set reasoning_content when processing thinking content', () => {
 			const endpoint = instaService.createInstance(OpenAIEndpoint,
 				{
 					...modelMetadata,
@@ -103,8 +103,9 @@ describe('OpenAIEndpoint - Reasoning Properties', () => {
 			expect(body.messages).toBeDefined();
 			const messages = body.messages as any[];
 			expect(messages).toHaveLength(1);
-			expect(messages[0].cot_id).toBe('test-thinking-123');
-			expect(messages[0].cot_summary).toBe('this is my reasoning');
+			expect(messages[0].reasoning_content).toBe('this is my reasoning');
+			expect(messages[0].cot_id).toBeUndefined();
+			expect(messages[0].cot_summary).toBeUndefined();
 		});
 
 		it('should handle multiple messages with thinking content', () => {
@@ -130,12 +131,12 @@ describe('OpenAIEndpoint - Reasoning Properties', () => {
 			expect(messages).toHaveLength(2);
 
 			// User message should not have thinking properties
-			expect(messages[0].cot_id).toBeUndefined();
-			expect(messages[0].cot_summary).toBeUndefined();
+			expect(messages[0].reasoning_content).toBeUndefined();
 
 			// Assistant message should have thinking properties
-			expect(messages[1].cot_id).toBe('reasoning-456');
-			expect(messages[1].cot_summary).toBe('complex reasoning here');
+			expect(messages[1].reasoning_content).toBe('complex reasoning here');
+			expect(messages[1].cot_id).toBeUndefined();
+			expect(messages[1].cot_summary).toBeUndefined();
 		});
 	});
 

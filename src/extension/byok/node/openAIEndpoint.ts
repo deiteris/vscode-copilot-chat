@@ -253,15 +253,21 @@ export class OpenAIEndpoint extends ChatEndpoint {
 			return body;
 		} else {
 			// Handle CAPI: provide callback for thinking data processing
-			const callback: RawMessageConversionCallback = (out, data) => {
-				if (data && data.id) {
-					out.cot_id = data.id;
-					out.cot_summary = Array.isArray(data.text) ? data.text.join('') : data.text;
-				}
-			};
-			const body = createCapiRequestBody(options, this.model, callback);
+			const body = createCapiRequestBody(options, this.model, this.getThinkingCallback());
 			return body;
 		}
+	}
+
+	/**
+	 * Returns a callback that writes thinking data into the outgoing CAPI message.
+	 * Override in subclasses to use a provider-specific field (e.g. Azure's cot_id).
+	 */
+	protected getThinkingCallback(): RawMessageConversionCallback {
+		return (out, data) => {
+			if (data) {
+				out.reasoning_content = Array.isArray(data.text) ? data.text.join('') : data.text;
+			}
+		};
 	}
 
 	override interceptBody(body: IEndpointBody | undefined): void {
