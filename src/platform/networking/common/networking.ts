@@ -122,6 +122,9 @@ export interface IEndpointBody {
 
 	/** ChatCompletions API for Anthropic models */
 	thinking_budget?: number;
+
+	/** OpenAI-compatible: whether the model may call multiple tools in one turn */
+	parallel_tool_calls?: boolean;
 }
 
 export interface IEndpointFetchOptions {
