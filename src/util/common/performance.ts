@@ -27,7 +27,22 @@ function _getNativePolyfill(): IMonacoPerformanceMarks {
 	};
 }
 
-const perf: IMonacoPerformanceMarks = (globalThis as { MonacoPerformanceMarks?: IMonacoPerformanceMarks }).MonacoPerformanceMarks ?? _getNativePolyfill();
+function _buildPerf(): IMonacoPerformanceMarks {
+	const monacoMarks = (globalThis as { MonacoPerformanceMarks?: Partial<IMonacoPerformanceMarks> }).MonacoPerformanceMarks;
+	if (!monacoMarks) {
+		return _getNativePolyfill();
+	}
+	// The VS Code host may provide an older MonacoPerformanceMarks that lacks clearMarks.
+	// Fill in any missing methods from the native polyfill to avoid runtime errors.
+	const polyfill = _getNativePolyfill();
+	return {
+		mark: monacoMarks.mark?.bind(monacoMarks) ?? polyfill.mark,
+		getMarks: monacoMarks.getMarks?.bind(monacoMarks) ?? polyfill.getMarks,
+		clearMarks: monacoMarks.clearMarks?.bind(monacoMarks) ?? polyfill.clearMarks,
+	};
+}
+
+const perf: IMonacoPerformanceMarks = _buildPerf();
 
 const chatExtPrefix = 'code/chat/ext/';
 
