@@ -11,6 +11,9 @@ export interface ThinkingDataInMessage {
 	// Copilot API fields for Completions
 	reasoning_opaque?: string;
 	reasoning_text?: string;
+
+	// OpenAI-compatible reasoning field used by DeepSeek, Qwen, and llama.cpp
+	reasoning_content?: string;
 }
 
 export interface RawThinkingDelta {

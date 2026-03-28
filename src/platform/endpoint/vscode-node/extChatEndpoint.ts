@@ -7,7 +7,6 @@ import { Raw } from '@vscode/prompt-tsx';
 import type { CancellationToken } from 'vscode';
 import * as vscode from 'vscode';
 import { FetchStreamRecorder } from '../../../platform/chat/common/chatMLFetcher';
-import { InlineThinkTagParser } from '../../../platform/thinking/common/inlineThinkTagParser';
 import { toErrorMessage } from '../../../util/common/errorMessage';
 import { ITokenizer, TokenizerType } from '../../../util/common/tokenizer';
 import { AsyncIterableObject } from '../../../util/vs/base/common/async';
@@ -206,37 +205,15 @@ export class ExtensionContributedChatEndpoint implements IChatEndpoint {
 			const response = await this.languageModel.sendRequest(vscodeMessages, vscodeOptions, token);
 			let text = '';
 			let numToolsCalled = 0;
-			let hadThinkingContent = false;
 			const requestId = ourRequestId;
 			let capturedUsage: APIUsage | undefined;
-
-			// Parses inline <think>…</think> tags from LanguageModelTextPart
-			// when the VS Code LM API provider doesn't separate reasoning content.
-			// This handles providers that forward reasoning_format=none output.
-			const inlineThinkParser = new InlineThinkTagParser();
 
 			// consume stream
 			for await (const chunk of response.stream) {
 				if (chunk instanceof vscode.LanguageModelTextPart) {
-					// Parse inline <think>…</think> tags from text content.
-					// When a provider (e.g. Ollama extension) doesn't separate reasoning,
-					// the <think> tags appear as plain text and need to be routed to thinking UI.
-					const segments = inlineThinkParser.processChunk(chunk.value);
-					for (const segment of segments) {
-						if (segment.type === 'thinking') {
-							hadThinkingContent = true;
-							if (streamRecorder.callback) {
-								await streamRecorder.callback(text, 0, {
-									text: '',
-									thinking: { text: segment.text },
-								});
-							}
-						} else {
-							text += segment.text;
-							if (streamRecorder.callback) {
-								await streamRecorder.callback(text, 0, { text: segment.text });
-							}
-						}
+					text += chunk.value;
+					if (streamRecorder.callback) {
+						await streamRecorder.callback(text, 0, { text: chunk.value });
 					}
 				} else if (chunk instanceof vscode.LanguageModelToolCallPart) {
 					if (streamRecorder.callback) {
@@ -273,7 +250,6 @@ export class ExtensionContributedChatEndpoint implements IChatEndpoint {
 						}
 					}
 				} else if (chunk instanceof vscode.LanguageModelThinkingPart) {
-					hadThinkingContent = true;
 					if (streamRecorder.callback) {
 						await streamRecorder.callback(text, 0, {
 							text: '',
@@ -283,24 +259,6 @@ export class ExtensionContributedChatEndpoint implements IChatEndpoint {
 								metadata: chunk.metadata
 							}
 						});
-					}
-				}
-			}
-
-			// Flush any remaining buffered content from the inline <think> parser
-			for (const segment of inlineThinkParser.flush()) {
-				if (segment.type === 'thinking') {
-					hadThinkingContent = true;
-					if (streamRecorder.callback) {
-						await streamRecorder.callback(text, 0, {
-							text: '',
-							thinking: { text: segment.text },
-						});
-					}
-				} else {
-					text += segment.text;
-					if (streamRecorder.callback) {
-						await streamRecorder.callback(text, 0, { text: segment.text });
 					}
 				}
 			}
@@ -316,19 +274,6 @@ export class ExtensionContributedChatEndpoint implements IChatEndpoint {
 					},
 					value: text,
 					resolvedModel: this.languageModel.id
-				};
-			} else if (hadThinkingContent) {
-				// The model produced only reasoning/thinking content with no response text or tool calls.
-				// This typically happens with DeepSeek-compatible reasoning models (e.g. Qwen3.5 via llama.cpp)
-				// when the model does not emit a closing </think> tag, causing the server to treat the entire
-				// output (including any tool call JSON) as reasoning_content and leave content empty.
-				// Configure the inference server to use reasoning_format=none, or ensure the model emits </think>
-				// before each response.
-				return {
-					type: ChatFetchResponseType.Unknown,
-					reason: 'The model returned only reasoning content with no response text or tool calls. If you are using llama.cpp, set reasoning_format=none on the server, or ensure the model closes its <think> block before responding.',
-					requestId: requestId,
-					serverRequestId: undefined
 				};
 			} else {
 				return {
