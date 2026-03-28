@@ -1825,6 +1825,12 @@
 							"description": "The endpoint URL for the Ollama server",
 							"default": "http://localhost:11434",
 							"title": "URL"
+						},
+						"apiKey": {
+							"type": "string",
+							"secret": true,
+							"description": "API key for the Ollama server (optional)",
+							"title": "API Key"
 						}
 					},
 					"required": [

@@ -35,6 +35,7 @@ const MINIMUM_OLLAMA_VERSION = '0.6.4';
 
 export interface OllamaConfig extends LanguageModelChatConfiguration {
 	url: string;
+	apiKey?: string;
 }
 
 export class OllamaLMProvider extends AbstractOpenAICompatibleLMProvider<OllamaConfig> {
@@ -89,16 +90,22 @@ export class OllamaLMProvider extends AbstractOpenAICompatibleLMProvider<OllamaC
 
 		try {
 			// Check Ollama server version before proceeding with model operations
-			await this._checkOllamaVersion(ollamaBaseUrl);
+			await this._checkOllamaVersion(ollamaBaseUrl, apiKey);
 
-			const response = await this._fetcherService.fetch(`${ollamaBaseUrl}/api/tags`, { method: 'GET', callSite: 'ollama-tags' });
+			const headers: Record<string, string> = {
+				'Content-Type': 'application/json'
+			};
+			if (apiKey) {
+				headers['Authorization'] = `Bearer ${apiKey}`;
+			}
+			const response = await this._fetcherService.fetch(`${ollamaBaseUrl}/api/tags`, { method: 'GET', callSite: 'ollama-tags', headers });
 			const models = (await response.json()).models;
 			this._knownModels = {};
 			for (const model of models) {
 				let modelInfo = this._modelCache.get(`${ollamaBaseUrl}/${model.model}`);
 				if (!modelInfo) {
 					try {
-						modelInfo = await this._getOllamaModelInfo(ollamaBaseUrl, model.model);
+						modelInfo = await this._getOllamaModelInfo(ollamaBaseUrl, model.model, apiKey);
 					} catch (e) {
 						const error = ErrorUtils.fromUnknown(e);
 						this._logService.error(error, 'ollamaProvider: failed to fetch Ollama model info');
@@ -138,11 +145,12 @@ export class OllamaLMProvider extends AbstractOpenAICompatibleLMProvider<OllamaC
 	protected override async createOpenAIEndPoint(model: OpenAICompatibleLanguageModelChatInformation<OllamaConfig>): Promise<OpenAIEndpoint> {
 		const modelInfo = this.getModelInfo(model.id, model.url);
 		const url = `${model.url}/v1/chat/completions`;
-		return this._instantiationService.createInstance(OpenAIEndpoint, modelInfo, model.configuration?.apiKey ?? '', url);
+		const apiKey = model.configuration?.apiKey ?? '';
+		return this._instantiationService.createInstance(OpenAIEndpoint, modelInfo, apiKey, url);
 	}
 
-	private async _getOllamaModelInfo(ollamaBaseUrl: string, modelId: string): Promise<IChatModelInformation> {
-		const modelInfo = await this._fetchOllamaModelInformation(ollamaBaseUrl, modelId);
+	private async _getOllamaModelInfo(ollamaBaseUrl: string, modelId: string, apiKey?: string): Promise<IChatModelInformation> {
+		const modelInfo = await this._fetchOllamaModelInformation(ollamaBaseUrl, modelId, apiKey);
 		const contextWindow = modelInfo?.model_info?.[`${modelInfo.model_info['general.architecture']}.context_length`] ?? 32768;
 		const outputTokens = contextWindow < 4096 ? Math.floor(contextWindow / 2) : 4096;
 		const modelCapabilities = {
@@ -187,13 +195,17 @@ export class OllamaLMProvider extends AbstractOpenAICompatibleLMProvider<OllamaC
 		return true; // versions are equal
 	}
 
-	private async _fetchOllamaModelInformation(ollamaBaseUrl: string, modelId: string): Promise<OllamaModelInfoAPIResponse> {
+	private async _fetchOllamaModelInformation(ollamaBaseUrl: string, modelId: string, apiKey?: string): Promise<OllamaModelInfoAPIResponse> {
+		const headers: Record<string, string> = {
+			'Content-Type': 'application/json'
+		};
+		if (apiKey) {
+			headers['Authorization'] = `Bearer ${apiKey}`;
+		}
 		const response = await this._fetcherService.fetch(`${ollamaBaseUrl}/api/show`, {
 			method: 'POST',
 			callSite: 'ollama-show',
-			headers: {
-				'Content-Type': 'application/json'
-			},
+			headers,
 			body: JSON.stringify({ model: modelId })
 		});
 		return response.json() as unknown as OllamaModelInfoAPIResponse;
@@ -202,9 +214,15 @@ export class OllamaLMProvider extends AbstractOpenAICompatibleLMProvider<OllamaC
 	 * Check if the connected Ollama server version meets the minimum requirements
 	 * @throws Error if version is below minimum or version check fails
 	 */
-	private async _checkOllamaVersion(ollamaBaseUrl: string): Promise<void> {
+	private async _checkOllamaVersion(ollamaBaseUrl: string, apiKey?: string): Promise<void> {
 		try {
-			const response = await this._fetcherService.fetch(`${ollamaBaseUrl}/api/version`, { method: 'GET', callSite: 'ollama-version' });
+			const headers: Record<string, string> = {
+				'Content-Type': 'application/json'
+			};
+			if (apiKey) {
+				headers['Authorization'] = `Bearer ${apiKey}`;
+			}
+			const response = await this._fetcherService.fetch(`${ollamaBaseUrl}/api/version`, { method: 'GET', callSite: 'ollama-version', headers });
 			const versionInfo = await response.json() as OllamaVersionResponse;
 
 			if (!this._isVersionSupported(versionInfo.version)) {
