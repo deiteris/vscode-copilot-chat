@@ -7,6 +7,7 @@ import type { CancellationToken } from 'vscode';
 import { ILogService, LogLevel } from '../../log/common/logService';
 import { ITelemetryService } from '../../telemetry/common/telemetry';
 import { TelemetryData } from '../../telemetry/common/telemetryData';
+import { InlineThinkTagParser } from '../../thinking/common/inlineThinkTagParser';
 import { RawThinkingDelta, ThinkingDelta } from '../../thinking/common/thinking';
 import { extractThinkingDeltaFromChoice, } from '../../thinking/common/thinkingUtils';
 import { FinishedCallback, getRequestId, ICodeVulnerabilityAnnotation, ICopilotBeginToolCall, ICopilotConfirmation, ICopilotError, ICopilotFunctionCall, ICopilotReference, ICopilotToolCall, ICopilotToolCallStreamUpdate, IIPCodeCitation, isCodeCitationAnnotation, isCopilotAnnotation, RequestId } from '../common/fetch';
@@ -319,6 +320,11 @@ export class SSEProcessor {
 		let allowCompletingSolution = true;
 		let thinkingFound = false;
 
+		// Parses inline <think>…</think> tags from delta.content when no native
+		// reasoning field (reasoning_content, thinking, etc.) is provided.
+		// This handles servers using reasoning_format=none (e.g. llama.cpp).
+		const inlineThinkParser = new InlineThinkTagParser();
+
 		// Iterate over arbitrarily sized chunks coming in from the network.
 		for await (const chunk of this.body) {
 			if (await this.maybeCancel('after awaiting body chunk')) {
@@ -338,6 +344,25 @@ export class SSEProcessor {
 				}
 				const lineWithoutData = dataLine.slice('data:'.length).trim();
 				if (lineWithoutData === '[DONE]') {
+					// Flush any remaining buffered content from the inline <think> parser
+					for (const segment of inlineThinkParser.flush()) {
+						// Find the first active solution to emit the flushed content
+						for (const [idx, sol] of Object.entries(this.solutions)) {
+							if (sol !== null) {
+								if (segment.type === 'thinking') {
+									thinkingFound = true;
+									await finishedCb(sol.text.join(''), Number(idx), {
+										text: sol.flush(),
+										thinking: { text: segment.text },
+									});
+								} else {
+									sol.append({ index: Number(idx), delta: { content: segment.text } });
+									await finishedCb(sol.text.join(''), Number(idx), { text: sol.flush() });
+								}
+								break;
+							}
+						}
+					}
 					yield* this.finishSolutions();
 					return;
 				}
@@ -555,11 +580,37 @@ export class SSEProcessor {
 					}
 
 					if (!handled) {
-						solution.append(choice);
+						// When no native thinking delta is present, check for inline
+						// <think>…</think> tags in content (reasoning_format=none).
+						const rawContent = choice.delta?.content;
+						if (rawContent && !thinkingDelta) {
+							const segments = inlineThinkParser.processChunk(rawContent);
+							let shouldContinue = false;
+							for (const segment of segments) {
+								if (segment.type === 'thinking') {
+									thinkingFound = true;
+									await finishedCb(solution.text.join(''), choice.index, {
+										text: solution.flush(),
+										thinking: { text: segment.text },
+									});
+								} else {
+									solution.append({ index: choice.index, delta: { content: segment.text } });
+									shouldContinue = await emitSolution();
+									if (shouldContinue) {
+										break;
+									}
+								}
+							}
+							if (shouldContinue) {
+								continue;
+							}
+						} else {
+							solution.append(choice);
 
-						// Call finishedCb to determine if the solution is now complete.
-						if (await emitSolution()) {
-							continue;
+							// Call finishedCb to determine if the solution is now complete.
+							if (await emitSolution()) {
+								continue;
+							}
 						}
 					}
 
