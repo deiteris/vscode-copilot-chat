@@ -185,8 +185,8 @@ class QwenDefaultPrompt extends QwenOptimizedBasePrompt {
 	protected override renderExplorationGuidance(_tools: ReturnType<typeof detectToolCapabilities>) {
 		return <>
 			Gather enough context to proceed confidently, then move to implementation. Persist through genuine blockers and continue working until the request is resolved.<br />
-			When a tool call fails or an approach is not working, try an alternative rather, don't attempt to brute force your way to the outcome. Step back and consider alternative approaches or other ways after two failed attempts.<br />
-			If gathered context is insufficient to perform the task, tell the user about it. Do not lie or come up with explanations that are not supported by the context.<br />
+			When a tool call fails, first determine whether it was caused by invalid or missing parameters you specified — if so, fix the parameters and retry rather than switching approach. Only consider an alternative approach after failures caused by system errors or external issues, and only after two such failures.<br />
+			If your approach is blocked (not due to a fixable parameter mistake), don't attempt to brute force your way to the outcome. Consider alternative approaches or other ways you might unblock yourself.<br />
 		</>;
 	}
 
