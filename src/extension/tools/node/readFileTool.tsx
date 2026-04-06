@@ -457,6 +457,10 @@ class ReadFileResult extends PromptElement<ReadFileResultProps> {
 
 		if (this.props.truncated) {
 			contents += `\n[File content truncated at line ${this.props.endLine}. Use ${ToolName.ReadFile} with offset/limit parameters to view more.]\n`;
+		} else if (this.props.endLine < documentSnapshot.lineCount) {
+			contents += `\n[Showing lines ${this.props.startLine}-${this.props.endLine} of ${documentSnapshot.lineCount}. Use offset=${this.props.endLine + 1} to read more.]\n`;
+		} else {
+			contents += `\n[End of file reached at line ${this.props.endLine}.]\n`;
 		}
 
 		return <>
