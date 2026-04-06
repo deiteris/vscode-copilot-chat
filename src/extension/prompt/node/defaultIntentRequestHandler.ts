@@ -326,7 +326,7 @@ export class DefaultIntentRequestHandler {
 				request: this.request,
 				documentContext: this.documentContext,
 				streamParticipants: this.makeResponseStreamParticipants(intentInvocation),
-				temperature: this.handlerOptions.temperature ?? this.options.temperature,
+				temperature: this.handlerOptions.temperature,
 				location: this.location,
 				overrideRequestLocation: this.handlerOptions.overrideRequestLocation,
 				interactionContext: this.documentContext?.document.uri,
@@ -595,7 +595,7 @@ interface IDefaultToolLoopOptions extends IToolCallingLoopOptions {
 	intent: IIntent;
 	documentContext: IDocumentContext | undefined;
 	location: ChatLocation;
-	temperature: number;
+	temperature?: number;
 	overrideRequestLocation?: ChatLocation;
 }
 
@@ -770,7 +770,10 @@ class DefaultToolCallingLoop extends ToolCallingLoop<IDefaultToolLoopOptions> {
 		});
 	}
 
-	private calculateTemperature(): number {
+	private calculateTemperature(): number | undefined {
+		if (this.options.temperature === undefined) {
+			return undefined;
+		}
 		if (this.options.request.attempt > 0) {
 			return Math.min(
 				this.options.temperature * (this.options.request.attempt + 1),

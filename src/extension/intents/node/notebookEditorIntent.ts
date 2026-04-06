@@ -75,7 +75,7 @@ export class NotebookEditorIntent extends EditCodeIntent {
 	protected override getIntentHandlerOptions(request: vscode.ChatRequest): IDefaultIntentRequestHandlerOptions | undefined {
 		return {
 			maxToolCallIterations: getRequestedToolCallIterationLimit(request) ?? this.instantiationService.invokeFunction(getAgentMaxRequests),
-			temperature: this.configurationService.getConfig(ConfigKey.Advanced.AgentTemperature) ?? 0,
+			temperature: this.configurationService.getConfig(ConfigKey.Advanced.AgentTemperature),
 			overrideRequestLocation: ChatLocation.Notebook,
 		};
 	}

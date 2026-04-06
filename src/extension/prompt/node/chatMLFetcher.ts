@@ -68,7 +68,6 @@ export abstract class AbstractChatMLFetcher extends Disposable implements IChatM
 
 	protected preparePostOptions(requestOptions: OptionalChatRequestParams): OptionalChatRequestParams {
 		return {
-			temperature: this.options.temperature,
 			top_p: this.options.topP,
 			// we disallow `stream=false` because we don't support non-streamed response
 			...requestOptions,
