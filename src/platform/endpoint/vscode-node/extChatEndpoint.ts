@@ -185,10 +185,17 @@ export class ExtensionContributedChatEndpoint implements IChatEndpoint {
 				description: tool.function.description,
 				inputSchema: tool.function.parameters,
 			})),
-			// Pass correlation ID and OTel trace context through modelOptions for cross-IPC restoration.
+			// Pass correlation ID, OTel trace context, and sampling params through modelOptions for
+			// cross-IPC restoration. Sampling params are picked up by LanguageModelOptions.Default.convert()
+			// in languageModelAccess.ts and forwarded to the BYOK provider's request body.
 			modelOptions: {
 				_capturingTokenCorrelationId: ourRequestId,
 				_otelTraceContext: activeTraceCtx ?? null,
+				temperature: requestOptions?.temperature,
+				top_p: requestOptions?.top_p,
+				max_tokens: requestOptions?.max_tokens,
+				presence_penalty: requestOptions?.presence_penalty,
+				frequency_penalty: requestOptions?.frequency_penalty,
 			}
 		};
 

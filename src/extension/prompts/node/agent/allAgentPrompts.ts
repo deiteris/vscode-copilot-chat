@@ -20,6 +20,7 @@ import './openai/gpt54Prompt';
 import './openai/gpt5CodexPrompt';
 import './openai/gpt5Prompt';
 import './openai/hiddenModelBPrompt';
+import './qwenPrompts';
 import './xAIPrompts';
 import './zaiPrompts';
 

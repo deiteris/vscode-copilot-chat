@@ -829,6 +829,7 @@ class LanguageModelOptions {
 	private static _defaultDesc: Record<string, (value: unknown) => boolean> = {
 		stop: or(isStringArray, isString),
 		temperature: isNumber,
+		top_p: isNumber,
 		max_tokens: isNumber,
 		frequency_penalty: isNumber,
 		presence_penalty: isNumber,

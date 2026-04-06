@@ -46,7 +46,9 @@ const testFamilies = [
 	'claude-sonnet-4.6',
 	'claude-opus-4.6',
 	'gemini-2.0-flash',
-	'grok-code-fast-1'
+	'grok-code-fast-1',
+	'qwen2',     // legacy Qwen prompt (DefaultQwenAgentPrompt)
+	'qwen3.5',   // optimized Qwen3.5+ prompt (QwenDefaultPrompt)
 ];
 
 testFamilies.forEach(family => {

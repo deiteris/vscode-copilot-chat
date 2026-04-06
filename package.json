@@ -157,7 +157,7 @@
 				"displayName": "%copilot.tools.searchCodebase.name%",
 				"icon": "$(folder)",
 				"userDescription": "%copilot.codebase.tool.description%",
-				"modelDescription": "Run a natural language search for relevant code or documentation comments from the user's current workspace. Returns relevant code snippets from the user's current workspace if it is large, or the full contents of the workspace if it is small.",
+				"modelDescription": "Run a natural language search for relevant code or documentation comments from the user's current workspace. Returns relevant code snippets from the user's current workspace if it is large, or the full contents of the workspace if it is small. If this tool returns the full workspace contents, you have all the context. Do not invoke in parallel with other tool calls.",
 				"tags": [
 					"codesearch",
 					"vscode_codesearch"
@@ -181,7 +181,7 @@
 				"displayName": "%copilot.tools.executionSubagent.name%",
 				"icon": "$(play)",
 				"userDescription": "%copilot.tools.executionSubagent.description%",
-				"modelDescription": "Launch an iterative execution-focused subagent that performs an execution-based task.\nUSE THIS INSTEAD OF RUNNING INDIVIDUAL COMMANDS WITH run_in_terminal EXCEPT IN THE RARE CASES THAT YOU NEED THE FULL OUTPUT OF A COMMAND.\nHere are some examples of how it can be used:\n- Run tests and filter the output to summarize which tests failed and why.\n- Install all dependencies of a project.\nReturns: A list of commands that were run, along with relevant excerpts of each command's output.\nInput fields:\n- query: What to execute, and what to look for in the output. Can include exact commands to run, or a description of an execution task.\n- description: Short user-visible invocation message.\nNOTE: In the subagent query, make sure to specify any restrictions or guidelines on running commands provided by the user earlier in the conversation.\nFor example, if the user instructs the agent to not edit files in a particular directory, make sure to include that instruction in the subagent query when relevant.",
+				"modelDescription": "Launch an iterative execution-focused subagent that performs an execution-based task.\nUSE THIS INSTEAD OF RUNNING INDIVIDUAL COMMANDS WITH run_in_terminal EXCEPT IN THE RARE CASES THAT YOU NEED THE FULL OUTPUT OF A COMMAND.\nHere are some examples of how it can be used:\n- Run tests and filter the output to summarize which tests failed and why.\n- Install all dependencies of a project.\nReturns: A list of commands that were run, along with relevant excerpts of each command's output.\nInput fields:\n- query: What to execute, and what to look for in the output. Can include exact commands to run, or a description of an execution task.\n- description: Short user-visible invocation message.\nNOTE: In the subagent query, make sure to specify any restrictions or guidelines on running commands provided by the user earlier in the conversation.\nFor example, if the user instructs the agent to not edit files in a particular directory, make sure to include that instruction in the subagent query when relevant.\nOnly invoke one at a time; don't call this tool multiple times in parallel.",
 				"when": "config.github.copilot.chat.executionSubagent.enabled",
 				"inputSchema": {
 					"type": "object",
@@ -207,7 +207,7 @@
 				"displayName": "%copilot.tools.searchSubagent.name%",
 				"icon": "$(search)",
 				"userDescription": "%copilot.tools.searchSubagent.description%",
-				"modelDescription": "Launch a fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. \"src/components/**/*.tsx\"), search code for keywords (eg. \"API endpoints\"), or answer questions about the codebase (eg. \"how do API endpoints work?\").\nReturns: A list of relevant files/snippet locations in the workspace.\n\nInput fields:\n- query: Natural language description of what to search for.\n- description: Short user-visible invocation message. \n- details: 2-3 sentences detailing the objective of the search agent.",
+				"modelDescription": "Launch a fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. \"src/components/**/*.tsx\"), search code for keywords (eg. \"API endpoints\"), or answer questions about the codebase (eg. \"how do API endpoints work?\").\nReturns: A list of relevant files/snippet locations in the workspace.\n\nInput fields:\n- query: Natural language description of what to search for.\n- description: Short user-visible invocation message. \n- details: 2-3 sentences detailing the objective of the search agent.\nPrefer this over directly calling textSearch, codebase, or fileSearch. Don't invoke for searches you are already performing.",
 				"when": "config.github.copilot.chat.searchSubagent.enabled",
 				"tags": [
 					"vscode_codesearch"
@@ -376,7 +376,7 @@
 				],
 				"displayName": "%copilot.tools.readFile.name%",
 				"userDescription": "%copilot.tools.readFile.userDescription%",
-				"modelDescription": "Read the contents of a file.\n\nYou must specify the line range you're interested in. Line numbers are 1-indexed. If the file contents returned are insufficient for your task, you may call this tool again to retrieve more content. Prefer reading larger ranges over doing many small reads. Binary files use startLine/endLine as byte offsets.",
+				"modelDescription": "Read the contents of a file.\n\nYou must specify the line range using startLine and endLine. If the file contents returned are insufficient for your task, you may call this tool again to retrieve more content. Prefer reading larger ranges over doing many small reads. Binary files use startLine/endLine as byte offsets. Read multiple files in parallel when possible. Don't skip search tools and call this tool directly unless you are confident about the exact file path.",
 				"tags": [
 					"vscode_codesearch"
 				],
@@ -389,11 +389,13 @@
 						},
 						"startLine": {
 							"type": "number",
-							"description": "The line number to start reading from, 1-based."
+							"description": "The line number to start reading from.",
+							"minimum": 1
 						},
 						"endLine": {
 							"type": "number",
-							"description": "The inclusive line number to end reading at, 1-based."
+							"description": "The inclusive line number to end reading at.",
+							"minimum": 1
 						}
 					},
 					"required": [

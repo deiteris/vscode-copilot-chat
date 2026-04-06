@@ -7,8 +7,8 @@ import { BasePromptElementProps, PromptElement, PromptElementProps, PromptPiece,
 import type { LanguageModelToolInformation } from 'vscode';
 import { IConfigurationService } from '../../../../platform/configuration/common/configurationService';
 import { CUSTOM_TOOL_SEARCH_NAME, isAnthropicContextEditingEnabled, isAnthropicCustomToolSearchEnabled, isAnthropicToolSearchEnabled, TOOL_SEARCH_TOOL_NAME } from '../../../../platform/networking/common/anthropic';
-import { IToolDeferralService } from '../../../../platform/networking/common/toolDeferralService';
 import { IChatEndpoint } from '../../../../platform/networking/common/networking';
+import { IToolDeferralService } from '../../../../platform/networking/common/toolDeferralService';
 import { IExperimentationService } from '../../../../platform/telemetry/common/nullExperimentationService';
 import { ToolName } from '../../../tools/common/toolNames';
 import { InstructionMessage } from '../base/instructionMessage';
