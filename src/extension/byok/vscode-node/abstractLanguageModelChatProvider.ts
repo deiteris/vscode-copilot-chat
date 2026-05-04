@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { CancellationToken, commands, LanguageModelChatInformation, LanguageModelChatMessage, LanguageModelChatMessage2, LanguageModelChatProvider, LanguageModelResponsePart2, PrepareLanguageModelChatModelOptions, Progress, ProvideLanguageModelChatResponseOptions } from 'vscode';
+import { CancellationToken, CancellationTokenSource, commands, LanguageModelChatInformation, LanguageModelChatMessage, LanguageModelChatMessage2, LanguageModelChatProvider, LanguageModelResponsePart2, PrepareLanguageModelChatModelOptions, Progress, ProvideLanguageModelChatResponseOptions } from 'vscode';
 import { IConfigurationService } from '../../../platform/configuration/common/configurationService';
 import { IChatModelInformation, ModelSupportedEndpoint } from '../../../platform/endpoint/common/endpointProvider';
 import { ILogService } from '../../../platform/log/common/logService';
@@ -13,6 +13,7 @@ import { IStringDictionary } from '../../../util/vs/base/common/collections';
 import { IInstantiationService } from '../../../util/vs/platform/instantiation/common/instantiation';
 import { CopilotLanguageModelWrapper } from '../../conversation/vscode-node/languageModelAccess';
 import { BYOKAuthType, BYOKKnownModels, byokKnownModelsToAPIInfo, BYOKModelCapabilities, resolveModelInfo } from '../common/byokProvider';
+import { registerByokCancelFn } from '../common/byokRequestRegistry';
 import { OpenAIEndpoint } from '../node/openAIEndpoint';
 import { IBYOKStorageService } from './byokStorageService';
 
@@ -75,6 +76,7 @@ export interface OpenAICompatibleLanguageModelChatInformation<C extends Language
 
 export abstract class AbstractOpenAICompatibleLMProvider<T extends LanguageModelChatConfiguration = LanguageModelChatConfiguration> extends AbstractLanguageModelChatProvider<T, OpenAICompatibleLanguageModelChatInformation<T>> {
 	protected readonly _lmWrapper: CopilotLanguageModelWrapper;
+	private _activeRequestCts: CancellationTokenSource | undefined;
 
 	constructor(
 		id: string,
@@ -92,8 +94,39 @@ export abstract class AbstractOpenAICompatibleLMProvider<T extends LanguageModel
 	}
 
 	async provideLanguageModelChatResponse(model: OpenAICompatibleLanguageModelChatInformation<T>, messages: Array<LanguageModelChatMessage | LanguageModelChatMessage2>, options: ProvideLanguageModelChatResponseOptions, progress: Progress<LanguageModelResponsePart2>, token: CancellationToken): Promise<void> {
-		const openAIChatEndpoint = await this.createOpenAIEndPoint(model);
-		return this._lmWrapper.provideLanguageModelResponse(openAIChatEndpoint, messages, options, options.requestInitiator, progress, token);
+		// Cancel any previous in-flight request so old connections are always cleaned up.
+		this._activeRequestCts?.cancel();
+		this._activeRequestCts?.dispose();
+
+		const cts = new CancellationTokenSource();
+		this._activeRequestCts = cts;
+		// Respect VS Code's LM token as one trigger.
+		const d = token.onCancellationRequested(() => cts.cancel());
+		// Also cancel when the chat participant's Stop-button token fires
+		// (VS Code never cancels the LM API token on Stop, so we bridge via the registry).
+		const deregisterCancel = registerByokCancelFn(() => cts.cancel());
+
+		try {
+			const openAIChatEndpoint = await this.createOpenAIEndPoint(model);
+			return await this._lmWrapper.provideLanguageModelResponse(openAIChatEndpoint, messages, options, options.requestInitiator, progress, cts.token);
+		} catch (e) {
+			// If WE cancelled the request (user clicked Stop), the network abort error is
+			// expected — return silently so VS Code doesn't show "Sorry, your request failed."
+			if (cts.token.isCancellationRequested) {
+				return;
+			}
+			throw e;
+		} finally {
+			// Always abort the underlying HTTP connection on exit — ensures the server
+			// (e.g. llama.cpp) detects the disconnect and releases its slot.
+			cts.cancel();
+			cts.dispose();
+			d.dispose();
+			deregisterCancel();
+			if (this._activeRequestCts === cts) {
+				this._activeRequestCts = undefined;
+			}
+		}
 	}
 
 	async provideTokenCount(model: OpenAICompatibleLanguageModelChatInformation<T>, text: string | LanguageModelChatMessage | LanguageModelChatMessage2, token: CancellationToken): Promise<number> {

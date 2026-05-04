@@ -18,6 +18,7 @@ import { autorun } from '../../../util/vs/base/common/observableInternal';
 import { generateUuid } from '../../../util/vs/base/common/uuid';
 import { IInstantiationService } from '../../../util/vs/platform/instantiation/common/instantiation';
 import { ChatRequest } from '../../../vscodeTypes';
+import { cancelAllByokRequests } from '../../byok/common/byokRequestRegistry';
 import { Intent, agentsToCommands } from '../../common/constants';
 import { ICopilotChatResultIn } from '../../prompt/common/conversation';
 import { getSwitchToAutoOnRateLimitConfirmation, isContinueOnError } from '../../prompt/common/specialRequestTypes';
@@ -204,6 +205,10 @@ Learn more about [GitHub Copilot](https://docs.github.com/copilot/using-github-c
 	private getChatParticipantHandler(id: string, name: string, defaultIntentIdOrGetter: IntentOrGetter): vscode.ChatExtendedRequestHandler {
 		return async (request, context, stream, token): Promise<vscode.ChatResult> => {
 			markChatExt(request.sessionId, ChatExtPerfMark.WillHandleParticipant);
+			// VS Code cancels this token when the user clicks Stop, but never cancels the
+			// separate token passed to LanguageModelChatProvider.provideLanguageModelChatResponse.
+			// Bridge the gap so BYOK requests (e.g. llama.cpp) are aborted immediately.
+			const stopBridge = token.onCancellationRequested(() => cancelAllByokRequests());
 			try {
 				// If we need to switch to the base model, this function will handle it
 				// Otherwise it just returns the same request passed into it
@@ -268,6 +273,7 @@ Learn more about [GitHub Copilot](https://docs.github.com/copilot/using-github-c
 
 				return result;
 			} finally {
+				stopBridge.dispose();
 				markChatExt(request.sessionId, ChatExtPerfMark.DidHandleParticipant);
 				clearChatExtMarks(request.sessionId);
 			}
